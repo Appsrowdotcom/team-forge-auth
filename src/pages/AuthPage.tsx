@@ -24,6 +24,12 @@ const AuthPage: React.FC = () => {
     return <Navigate to={redirectPath} replace />;
   }
 
+  // If user is authenticated but profile is still loading, redirect to user dashboard as fallback
+  if (user && !loading && !profile) {
+    console.log('User authenticated but no profile found, redirecting to user dashboard');
+    return <Navigate to="/user/dashboard" replace />;
+  }
+
   return <AuthForm />;
 };
 
