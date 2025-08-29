@@ -17,8 +17,10 @@ export type Database = {
       projects: {
         Row: {
           admin_id: string | null
+          comments: Json | null
           created_at: string | null
           deadline: string | null
+          description: string | null
           id: string
           name: string
           status: string | null
@@ -26,8 +28,10 @@ export type Database = {
         }
         Insert: {
           admin_id?: string | null
+          comments?: Json | null
           created_at?: string | null
           deadline?: string | null
+          description?: string | null
           id?: string
           name: string
           status?: string | null
@@ -35,8 +39,10 @@ export type Database = {
         }
         Update: {
           admin_id?: string | null
+          comments?: Json | null
           created_at?: string | null
           deadline?: string | null
+          description?: string | null
           id?: string
           name?: string
           status?: string | null
@@ -142,7 +148,7 @@ export type Database = {
           id: string
           name: string
           rank: string | null
-          role: string
+          role: string | null
           specialization: string | null
         }
         Insert: {
@@ -151,7 +157,7 @@ export type Database = {
           id?: string
           name: string
           rank?: string | null
-          role: string
+          role?: string | null
           specialization?: string | null
         }
         Update: {
@@ -160,7 +166,7 @@ export type Database = {
           id?: string
           name?: string
           rank?: string | null
-          role?: string
+          role?: string | null
           specialization?: string | null
         }
         Relationships: []
