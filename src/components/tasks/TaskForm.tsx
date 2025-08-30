@@ -36,6 +36,9 @@ export const TaskForm: React.FC<TaskFormProps> = ({
     status: 'To Do',
   });
   const [users, setUsers] = useState<User[]>([]);
+  
+  // Ensure users is always an array
+  const safeUsers = Array.isArray(users) ? users : [];
   const [loading, setLoading] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const { toast } = useToast();
@@ -84,6 +87,33 @@ export const TaskForm: React.FC<TaskFormProps> = ({
 
       console.log('Users query result:', { data, error });
       console.log('Raw data:', JSON.stringify(data, null, 2));
+      
+      // Debug: Check for users with empty names
+      if (data && data.length > 0) {
+        const usersWithEmptyNames = data.filter(user => !user.name || user.name.trim() === '');
+        const usersWithEmptyIds = data.filter(user => !user.id || user.id.trim() === '');
+        const usersWithNullNames = data.filter(user => user.name === null || user.name === undefined);
+        const usersWithNullIds = data.filter(user => user.id === null || user.id === undefined);
+        
+        console.log('Users with empty names:', usersWithEmptyNames);
+        console.log('Users with empty IDs:', usersWithEmptyIds);
+        console.log('Users with null names:', usersWithNullNames);
+        console.log('Users with null IDs:', usersWithNullIds);
+        console.log('Total users found:', data.length);
+        console.log('Users with valid names:', data.filter(user => user.name && user.name.trim() !== '').length);
+        
+        // Log each user for debugging
+        data.forEach((user, index) => {
+          console.log(`User ${index + 1}:`, {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            idType: typeof user.id,
+            nameType: typeof user.name
+          });
+        });
+      }
 
       if (error) {
         console.error('Error fetching users:', error);
@@ -103,17 +133,27 @@ export const TaskForm: React.FC<TaskFormProps> = ({
       }
 
       // Transform the data to ensure we have the right structure
-      const transformedUsers = data.map(user => ({
-        id: user.id,
-        name: user.name || user.email?.split('@')[0] || 'Unknown User',
-        email: user.email,
-        role: user.role,
-        rank: user.rank,
-        specialization: user.specialization
-      }));
+      const transformedUsers = data
+        .filter(user => user.id && user.id.trim() !== '') // Ensure user has valid ID
+        .map(user => ({
+          id: user.id,
+          name: user.name || user.email?.split('@')[0] || 'Unknown User',
+          email: user.email,
+          role: user.role,
+          rank: user.rank,
+          specialization: user.specialization
+        }))
+        .filter(user => user.name && user.name.trim() !== ''); // Filter out users with empty names
 
       console.log(`Successfully fetched ${transformedUsers.length} users:`, transformedUsers);
-      setUsers(transformedUsers);
+      
+      // Ensure we always set a valid array
+      if (transformedUsers && Array.isArray(transformedUsers)) {
+        setUsers(transformedUsers);
+      } else {
+        console.warn('transformedUsers is not a valid array, setting empty array');
+        setUsers([]);
+      }
 
       toast({
         title: 'Success',
@@ -139,30 +179,54 @@ export const TaskForm: React.FC<TaskFormProps> = ({
         .select('id, name, email, role, rank, specialization')
         .order('created_at', { ascending: false }); // Order by created_at instead
 
-      if (!userError && userData && userData.length > 0) {
-        console.log('Alternative method 1 successful:', userData);
-        const formattedUsers = userData.map(user => ({
-          id: user.id,
-          name: user.name || 'Unknown User',
-          email: user.email,
-          role: user.role,
-          rank: user.rank,
-          specialization: user.specialization
-        }));
-        setUsers(formattedUsers);
-        return;
-      }
+             if (!userError && userData && userData.length > 0) {
+         console.log('Alternative method 1 successful:', userData);
+         const formattedUsers = userData
+           .filter(user => user.id && user.id.trim() !== '') // Ensure user has valid ID
+           .map(user => ({
+             id: user.id,
+             name: user.name || 'Unknown User',
+             email: user.email,
+             role: user.role,
+             rank: user.rank,
+             specialization: user.specialization
+           }))
+           .filter(user => user.name && user.name.trim() !== ''); // Filter out users with empty names
+         
+         console.log(`Alternative method 1: ${formattedUsers.length} valid users found`);
+         
+         // Ensure we always set a valid array
+         if (formattedUsers && Array.isArray(formattedUsers)) {
+           setUsers(formattedUsers);
+         } else {
+           console.warn('formattedUsers is not a valid array, setting empty array');
+           setUsers([]);
+         }
+         return;
+       }
 
       // Method 3: Try without ordering
       const { data: userData2, error: userError2 } = await supabase
         .from('users')
         .select('id, name, email');
 
-      if (!userError2 && userData2 && userData2.length > 0) {
-        console.log('Alternative method 2 successful:', userData2);
-        setUsers(userData2);
-        return;
-      }
+             if (!userError2 && userData2 && userData2.length > 0) {
+         console.log('Alternative method 2 successful:', userData2);
+         const validUsers = userData2
+           .filter(user => user.id && user.id.trim() !== '') // Ensure user has valid ID
+           .filter(user => user.name && user.name.trim() !== ''); // Filter out users with empty names
+         
+         console.log(`Alternative method 2: ${validUsers.length} valid users found`);
+         
+         // Ensure we always set a valid array
+         if (validUsers && Array.isArray(validUsers)) {
+           setUsers(validUsers);
+         } else {
+           console.warn('validUsers is not a valid array, setting empty array');
+           setUsers([]);
+         }
+         return;
+       }
 
       // Method 4: Check if it's a permissions issue
       const { data: testData, error: testError } = await supabase
@@ -170,6 +234,17 @@ export const TaskForm: React.FC<TaskFormProps> = ({
         .select('count', { count: 'exact', head: true });
 
       console.log('Table access test:', { count: testData, error: testError });
+      
+      // Method 5: Try to get a sample of users to see what's in the database
+      const { data: sampleData, error: sampleError } = await supabase
+        .from('users')
+        .select('*')
+        .limit(5);
+      
+      console.log('Sample users from database:', sampleData);
+      if (sampleError) {
+        console.error('Sample query error:', sampleError);
+      }
       
       if (testError) {
         toast({
@@ -291,6 +366,14 @@ export const TaskForm: React.FC<TaskFormProps> = ({
   useEffect(() => {
     fetchUsers();
   }, []);
+  
+  // Safety check: Ensure users is always an array
+  useEffect(() => {
+    if (!Array.isArray(users)) {
+      console.warn('Users state is not an array, resetting to empty array');
+      setUsers([]);
+    }
+  }, [users]);
 
   // Populate form data when editing
   useEffect(() => {
@@ -350,22 +433,47 @@ export const TaskForm: React.FC<TaskFormProps> = ({
             onValueChange={(value) => setFormData({ ...formData, assigned_user_id: value })}
           >
             <SelectTrigger>
-              <SelectValue placeholder={
-                loadingUsers 
-                  ? "Loading users..." 
-                  : users.length > 0 
-                    ? "Select user" 
-                    : "No users available"
-              } />
+                             <SelectValue placeholder={
+                 loadingUsers 
+                   ? "Loading users..." 
+                   : safeUsers.length > 0 
+                     ? "Select user" 
+                     : "No users available"
+               } />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="unassigned">Unassigned</SelectItem>
-              {users.map((user) => (
-                <SelectItem key={user.id} value={user.id}>
-                  {user.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
+                         <SelectContent>
+               <SelectItem value="unassigned">Unassigned</SelectItem>
+               {safeUsers
+                 .filter(user => user && user.id && user.id.trim() !== '' && user.name && user.name.trim() !== '')
+                 .map((user) => {
+                   // Triple-check that we have valid data before rendering
+                   try {
+                     if (!user || !user.id || !user.name || user.id.trim() === '' || user.name.trim() === '') {
+                       console.warn('Skipping invalid user:', user);
+                       return null;
+                     }
+                     
+                     // Ensure the values are strings and not empty
+                     const userId = String(user.id).trim();
+                     const userName = String(user.name).trim();
+                     
+                     if (userId === '' || userName === '') {
+                       console.warn('User has empty string after conversion:', { userId, userName, originalUser: user });
+                       return null;
+                     }
+                     
+                     return (
+                       <SelectItem key={userId} value={userId}>
+                         {userName}
+                       </SelectItem>
+                     );
+                   } catch (error) {
+                     console.error('Error rendering user item:', error, user);
+                     return null;
+                   }
+                 })
+                 .filter(Boolean)} {/* Remove any null items */}
+             </SelectContent>
           </Select>
         </div>
 

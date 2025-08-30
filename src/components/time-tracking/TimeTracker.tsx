@@ -264,7 +264,7 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({ className }) => {
               <SelectValue placeholder="Select a task (optional)" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">No specific task</SelectItem>
+              <SelectItem value="no-task">No specific task</SelectItem>
               {tasks.map((task) => (
                 <SelectItem key={task.id} value={task.id}>
                   {task.name}
