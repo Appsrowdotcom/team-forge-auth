@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface User {
   id: string;
@@ -37,8 +38,40 @@ export const TaskForm: React.FC<TaskFormProps> = ({
   const [loading, setLoading] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const { toast } = useToast();
+  const { profile } = useAuth();
 
   const statusOptions = ['To Do', 'In Progress', 'Completed', 'Blocked', 'Review'];
+
+  // INSERT INTO StatusHistory (project_or_task_id, status, updated_by, timestamp): log every status change for auditing.
+  const logStatusChange = async (taskId: string, newStatus: string, oldStatus?: string) => {
+    // Only log if status actually changed
+    if (oldStatus && oldStatus === newStatus) return;
+    
+    if (!profile?.id) {
+      console.error('User not authenticated, cannot log status change');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('status_history')
+        .insert({
+          entity_id: taskId,
+          entity_type: 'task',
+          status: newStatus,
+          updated_by: profile.id,
+          updated_at: new Date().toISOString(),
+        });
+
+      if (error) {
+        console.error('Error logging status change:', error);
+        // Don't fail the main operation if logging fails
+      }
+    } catch (error) {
+      console.error('Error logging status change:', error);
+      // Don't fail the main operation if logging fails
+    }
+  };
 
   const fetchUsers = async () => {
     try {
@@ -114,18 +147,22 @@ export const TaskForm: React.FC<TaskFormProps> = ({
           return;
         }
 
+        // Log status change for auditing
+        await logStatusChange(editTask.id, formData.status, editTask.status);
+
         toast({
           title: 'Success',
           description: 'Task updated successfully',
         });
       } else {
         // Create new task
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('tasks')
           .insert([{
             ...taskData,
             created_at: new Date().toISOString(),
-          }]);
+          }])
+          .select();
 
         if (error) {
           console.error('Error creating task:', error);
@@ -135,6 +172,11 @@ export const TaskForm: React.FC<TaskFormProps> = ({
             variant: 'destructive',
           });
           return;
+        }
+
+        // Log initial status for new tasks
+        if (data && data[0]) {
+          await logStatusChange(data[0].id, formData.status);
         }
 
         toast({
