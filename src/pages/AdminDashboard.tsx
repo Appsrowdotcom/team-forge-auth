@@ -2,10 +2,13 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { LogOut, Users, FolderOpen, BarChart3, Plus } from 'lucide-react';
+import { LogOut, Users, FolderOpen, BarChart3, Plus, ArrowLeft } from 'lucide-react';
 import { ProjectForm } from '@/components/projects/ProjectForm';
 import { ProjectList } from '@/components/projects/ProjectList';
 import { ProjectComments } from '@/components/projects/ProjectComments';
+import { TaskList } from '@/components/tasks/TaskList';
+import { TaskForm } from '@/components/tasks/TaskForm';
+import { TaskComments } from '@/components/tasks/TaskComments';
 
 const AdminDashboard: React.FC = () => {
   const { profile, signOut } = useAuth();
@@ -13,6 +16,12 @@ const AdminDashboard: React.FC = () => {
   const [editingProject, setEditingProject] = useState<any>(null);
   const [showComments, setShowComments] = useState<any>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  
+  // Task management states
+  const [selectedProject, setSelectedProject] = useState<any>(null);
+  const [showTaskForm, setShowTaskForm] = useState(false);
+  const [editingTask, setEditingTask] = useState<any>(null);
+  const [showTaskComments, setShowTaskComments] = useState<any>(null);
 
   const handleSignOut = async () => {
     await signOut();
@@ -40,6 +49,45 @@ const AdminDashboard: React.FC = () => {
 
   const handleCommentsClose = () => {
     setShowComments(null);
+    setRefreshTrigger(prev => prev + 1);
+  };
+
+  // Task management handlers
+  const handleViewTasks = (project: any) => {
+    setSelectedProject(project);
+    setShowProjectForm(false);
+    setShowComments(null);
+  };
+
+  const handleBackToProjects = () => {
+    setSelectedProject(null);
+    setShowTaskForm(false);
+    setEditingTask(null);
+    setShowTaskComments(null);
+  };
+
+  const handleCreateTask = () => {
+    setEditingTask(null);
+    setShowTaskForm(true);
+  };
+
+  const handleEditTask = (task: any) => {
+    setEditingTask(task);
+    setShowTaskForm(true);
+  };
+
+  const handleTaskSuccess = () => {
+    setShowTaskForm(false);
+    setEditingTask(null);
+    setRefreshTrigger(prev => prev + 1);
+  };
+
+  const handleTaskComments = (task: any) => {
+    setShowTaskComments(task);
+  };
+
+  const handleTaskCommentsClose = () => {
+    setShowTaskComments(null);
     setRefreshTrigger(prev => prev + 1);
   };
 
@@ -125,8 +173,54 @@ const AdminDashboard: React.FC = () => {
           </Card>
         </div>
 
-        {/* Project Management */}
-        {showProjectForm ? (
+        {/* Content Management */}
+        {selectedProject ? (
+          // Task Management View
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Button variant="outline" onClick={handleBackToProjects}>
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Back to Projects
+                    </Button>
+                    <div>
+                      <CardTitle>Project: {selectedProject.name}</CardTitle>
+                      <p className="text-muted-foreground">Manage tasks for this project</p>
+                    </div>
+                  </div>
+                </div>
+              </CardHeader>
+            </Card>
+
+            {showTaskForm ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>{editingTask ? 'Edit Task' : 'Create New Task'}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <TaskForm
+                    projectId={selectedProject.id}
+                    editTask={editingTask}
+                    onSuccess={handleTaskSuccess}
+                    onCancel={() => setShowTaskForm(false)}
+                  />
+                </CardContent>
+              </Card>
+            ) : (
+              <TaskList
+                projectId={selectedProject.id}
+                projectName={selectedProject.name}
+                onCreateTask={handleCreateTask}
+                onEditTask={handleEditTask}
+                onTaskComments={handleTaskComments}
+                refreshTrigger={refreshTrigger}
+              />
+            )}
+          </div>
+        ) : showProjectForm ? (
+          // Project Form View
           <Card>
             <CardHeader>
               <CardTitle>{editingProject ? 'Edit Project' : 'Create New Project'}</CardTitle>
@@ -140,19 +234,29 @@ const AdminDashboard: React.FC = () => {
             </CardContent>
           </Card>
         ) : (
+          // Project List View
           <ProjectList
             onEditProject={handleEditProject}
             onViewComments={handleViewComments}
+            onViewTasks={handleViewTasks}
             refreshTrigger={refreshTrigger}
           />
         )}
 
-        {/* Comments Modal */}
+        {/* Modals */}
         {showComments && (
           <ProjectComments
             project={showComments}
             onClose={handleCommentsClose}
             onCommentAdded={() => setRefreshTrigger(prev => prev + 1)}
+          />
+        )}
+
+        {showTaskComments && (
+          <TaskComments
+            task={showTaskComments}
+            onClose={handleTaskCommentsClose}
+            onCommentAdded={handleTaskCommentsClose}
           />
         )}
       </main>
