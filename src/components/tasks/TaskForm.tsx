@@ -11,6 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 interface User {
   id: string;
   name: string;
+  email?: string; // Added email as it's commonly available
 }
 
 interface TaskFormProps {
@@ -30,7 +31,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
     name: '',
     type: '',
     description: '',
-    assigned_user_id: 'unassigned', // Changed from empty string to 'unassigned'
+    assigned_user_id: 'unassigned',
     estimate_hours: '',
     status: 'To Do',
   });
@@ -42,9 +43,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
 
   const statusOptions = ['To Do', 'In Progress', 'Completed', 'Blocked', 'Review'];
 
-  // INSERT INTO StatusHistory (project_or_task_id, status, updated_by, timestamp): log every status change for auditing.
   const logStatusChange = async (taskId: string, newStatus: string, oldStatus?: string) => {
-    // Only log if status actually changed
     if (oldStatus && oldStatus === newStatus) return;
     
     if (!profile?.id) {
@@ -65,42 +64,134 @@ export const TaskForm: React.FC<TaskFormProps> = ({
 
       if (error) {
         console.error('Error logging status change:', error);
-        // Don't fail the main operation if logging fails
       }
     } catch (error) {
       console.error('Error logging status change:', error);
-      // Don't fail the main operation if logging fails
     }
   };
 
+  // Enhanced user fetching with multiple approaches and debugging
   const fetchUsers = async () => {
     try {
       setLoadingUsers(true);
+      console.log('Fetching users from users table...');
+      
+      // Method 1: Try basic select first
       const { data, error } = await supabase
         .from('users')
-        .select('id, name')
+        .select('*') // Select all columns to see what's available
         .order('name');
+
+      console.log('Users query result:', { data, error });
+      console.log('Raw data:', JSON.stringify(data, null, 2));
 
       if (error) {
         console.error('Error fetching users:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to load users',
-          variant: 'destructive',
-        });
+        console.error('Error details:', error.details, error.hint, error.code);
+        
+        // Try alternative method if main query fails
+        await fetchUsersAlternative();
         return;
       }
 
-      setUsers(data || []);
-    } catch (error) {
-      console.error('Error fetching users:', error);
+      if (!data || data.length === 0) {
+        console.warn('No users found in users table');
+        
+        // Try alternative method if no data
+        await fetchUsersAlternative();
+        return;
+      }
+
+      // Transform the data to ensure we have the right structure
+      const transformedUsers = data.map(user => ({
+        id: user.id,
+        name: user.name || user.email?.split('@')[0] || 'Unknown User',
+        email: user.email,
+        role: user.role,
+        rank: user.rank,
+        specialization: user.specialization
+      }));
+
+      console.log(`Successfully fetched ${transformedUsers.length} users:`, transformedUsers);
+      setUsers(transformedUsers);
+
       toast({
-        title: 'Error',
-        description: 'Failed to load users',
-        variant: 'destructive',
+        title: 'Success',
+        description: `Loaded ${transformedUsers.length} users`,
       });
+
+    } catch (error) {
+      console.error('Unexpected error fetching users:', error);
+      await fetchUsersAlternative();
     } finally {
       setLoadingUsers(false);
+    }
+  };
+
+  // Alternative fetch method using different approaches
+  const fetchUsersAlternative = async () => {
+    try {
+      console.log('Trying alternative user fetch methods...');
+      
+      // Method 2: Try with explicit column selection matching your schema
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id, name, email, role, rank, specialization')
+        .order('created_at', { ascending: false }); // Order by created_at instead
+
+      if (!userError && userData && userData.length > 0) {
+        console.log('Alternative method 1 successful:', userData);
+        const formattedUsers = userData.map(user => ({
+          id: user.id,
+          name: user.name || 'Unknown User',
+          email: user.email,
+          role: user.role,
+          rank: user.rank,
+          specialization: user.specialization
+        }));
+        setUsers(formattedUsers);
+        return;
+      }
+
+      // Method 3: Try without ordering
+      const { data: userData2, error: userError2 } = await supabase
+        .from('users')
+        .select('id, name, email');
+
+      if (!userError2 && userData2 && userData2.length > 0) {
+        console.log('Alternative method 2 successful:', userData2);
+        setUsers(userData2);
+        return;
+      }
+
+      // Method 4: Check if it's a permissions issue
+      const { data: testData, error: testError } = await supabase
+        .from('users')
+        .select('count', { count: 'exact', head: true });
+
+      console.log('Table access test:', { count: testData, error: testError });
+      
+      if (testError) {
+        toast({
+          title: 'Database Error',
+          description: `Cannot access users table: ${testError.message}`,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Permission Issue',
+          description: 'Can access users table but cannot read data. Check RLS policies.',
+          variant: 'destructive',
+        });
+      }
+      
+    } catch (error) {
+      console.error('All alternative fetch methods failed:', error);
+      toast({
+        title: 'Error',
+        description: 'Unable to fetch users with any method',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -124,7 +215,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
         name: formData.name.trim(),
         type: formData.type.trim(),
         description: formData.description.trim(),
-        assigned_user_id: formData.assigned_user_id === 'unassigned' ? null : formData.assigned_user_id, // Convert 'unassigned' to null
+        assigned_user_id: formData.assigned_user_id === 'unassigned' ? null : formData.assigned_user_id,
         estimate_hours: formData.estimate_hours ? parseFloat(formData.estimate_hours) : null,
         status: formData.status,
         updated_at: new Date().toISOString(),
@@ -141,13 +232,12 @@ export const TaskForm: React.FC<TaskFormProps> = ({
           console.error('Error updating task:', error);
           toast({
             title: 'Error',
-            description: 'Failed to update task',
+            description: `Failed to update task: ${error.message}`,
             variant: 'destructive',
           });
           return;
         }
 
-        // Log status change for auditing
         await logStatusChange(editTask.id, formData.status, editTask.status);
 
         toast({
@@ -168,13 +258,12 @@ export const TaskForm: React.FC<TaskFormProps> = ({
           console.error('Error creating task:', error);
           toast({
             title: 'Error',
-            description: 'Failed to create task',
+            description: `Failed to create task: ${error.message}`,
             variant: 'destructive',
           });
           return;
         }
 
-        // Log initial status for new tasks
         if (data && data[0]) {
           await logStatusChange(data[0].id, formData.status);
         }
@@ -198,17 +287,19 @@ export const TaskForm: React.FC<TaskFormProps> = ({
     }
   };
 
+  // Fetch users when component mounts
   useEffect(() => {
     fetchUsers();
   }, []);
 
+  // Populate form data when editing
   useEffect(() => {
     if (editTask) {
       setFormData({
         name: editTask.name || '',
         type: editTask.type || '',
         description: editTask.description || '',
-        assigned_user_id: editTask.assigned_user_id || 'unassigned', // Convert null to 'unassigned'
+        assigned_user_id: editTask.assigned_user_id || 'unassigned',
         estimate_hours: editTask.estimate_hours?.toString() || '',
         status: editTask.status || 'To Do',
       });
@@ -259,7 +350,13 @@ export const TaskForm: React.FC<TaskFormProps> = ({
             onValueChange={(value) => setFormData({ ...formData, assigned_user_id: value })}
           >
             <SelectTrigger>
-              <SelectValue placeholder={loadingUsers ? "Loading users..." : "Select user"} />
+              <SelectValue placeholder={
+                loadingUsers 
+                  ? "Loading users..." 
+                  : users.length > 0 
+                    ? "Select user" 
+                    : "No users available"
+              } />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="unassigned">Unassigned</SelectItem>
