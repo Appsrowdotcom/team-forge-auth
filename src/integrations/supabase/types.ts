@@ -96,33 +96,42 @@ export type Database = {
       tasks: {
         Row: {
           assigned_user_id: string | null
+          comment: Json | null
           created_at: string | null
+          description: string | null
           estimate_hours: number | null
           id: string
-          name: string
+          name: string | null
           project_id: string | null
           status: string | null
           type: string | null
+          updated_at: string | null
         }
         Insert: {
           assigned_user_id?: string | null
+          comment?: Json | null
           created_at?: string | null
+          description?: string | null
           estimate_hours?: number | null
           id?: string
-          name: string
+          name?: string | null
           project_id?: string | null
           status?: string | null
           type?: string | null
+          updated_at?: string | null
         }
         Update: {
           assigned_user_id?: string | null
+          comment?: Json | null
           created_at?: string | null
+          description?: string | null
           estimate_hours?: number | null
           id?: string
-          name?: string
+          name?: string | null
           project_id?: string | null
           status?: string | null
           type?: string | null
+          updated_at?: string | null
         }
         Relationships: [
           {
