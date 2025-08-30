@@ -29,7 +29,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
     name: '',
     type: '',
     description: '',
-    assigned_user_id: '',
+    assigned_user_id: 'unassigned', // Changed from empty string to 'unassigned'
     estimate_hours: '',
     status: 'To Do',
   });
@@ -91,7 +91,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
         name: formData.name.trim(),
         type: formData.type.trim(),
         description: formData.description.trim(),
-        assigned_user_id: formData.assigned_user_id || null,
+        assigned_user_id: formData.assigned_user_id === 'unassigned' ? null : formData.assigned_user_id, // Convert 'unassigned' to null
         estimate_hours: formData.estimate_hours ? parseFloat(formData.estimate_hours) : null,
         status: formData.status,
         updated_at: new Date().toISOString(),
@@ -166,7 +166,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
         name: editTask.name || '',
         type: editTask.type || '',
         description: editTask.description || '',
-        assigned_user_id: editTask.assigned_user_id || '',
+        assigned_user_id: editTask.assigned_user_id || 'unassigned', // Convert null to 'unassigned'
         estimate_hours: editTask.estimate_hours?.toString() || '',
         status: editTask.status || 'To Do',
       });
@@ -220,7 +220,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
               <SelectValue placeholder={loadingUsers ? "Loading users..." : "Select user"} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Unassigned</SelectItem>
+              <SelectItem value="unassigned">Unassigned</SelectItem>
               {users.map((user) => (
                 <SelectItem key={user.id} value={user.id}>
                   {user.name}
