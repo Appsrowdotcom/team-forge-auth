@@ -39,8 +39,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Fetch user profile from our custom users table with retry logic
-  const fetchUserProfile = async (userId: string, retryCount = 0): Promise<UserProfile | null> => {
+  // Fetch user profile from our custom users table
+  const fetchUserProfile = async (userId: string) => {
     try {
       const { data, error } = await supabase
         .from('users')
@@ -50,14 +50,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) {
         console.error('Error fetching user profile:', error);
-
-        // If it's a row not found error and we haven't retried too many times, wait and retry
-        if (error.code === 'PGRST116' && retryCount < 3) {
-          console.log(`Profile not found, retrying in ${(retryCount + 1) * 1000}ms...`);
-          await new Promise(resolve => setTimeout(resolve, (retryCount + 1) * 1000));
-          return fetchUserProfile(userId, retryCount + 1);
-        }
-
         return null;
       }
 
@@ -73,53 +65,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('Auth state changed:', event, session?.user?.id);
-
+        
         setSession(session);
         setUser(session?.user ?? null);
-
+        
         // Fetch user profile when authenticated
         if (session?.user) {
-          try {
+          // Defer the profile fetch to avoid potential callback issues
+          setTimeout(async () => {
             const userProfile = await fetchUserProfile(session.user.id);
             setProfile(userProfile);
-          } catch (error) {
-            console.error('Failed to fetch user profile:', error);
-            // Set a default profile to allow redirection
-            setProfile({
-              id: session.user.id,
-              name: session.user.user_metadata?.name || session.user.email || 'User',
-              email: session.user.email || '',
-              role: 'User' // Default role
-            });
-          }
+            setLoading(false);
+          }, 0);
         } else {
           setProfile(null);
+          setLoading(false);
         }
-        setLoading(false);
       }
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-
+      
       if (session?.user) {
-        try {
-          const userProfile = await fetchUserProfile(session.user.id);
+        fetchUserProfile(session.user.id).then((userProfile) => {
           setProfile(userProfile);
-        } catch (error) {
-          console.error('Failed to fetch user profile:', error);
-          // Set a default profile to allow redirection
-          setProfile({
-            id: session.user.id,
-            name: session.user.user_metadata?.name || session.user.email || 'User',
-            email: session.user.email || '',
-            role: 'User' // Default role
-          });
-        }
+          setLoading(false);
+        });
+      } else {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => subscription.unsubscribe();
@@ -127,7 +104,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signUp = async (email: string, password: string, name: string) => {
     const redirectUrl = `${window.location.origin}/`;
-
+    
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -138,7 +115,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
     });
-
+    
     return { error };
   };
 
@@ -147,7 +124,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       email,
       password,
     });
-
+    
     return { error };
   };
 

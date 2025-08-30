@@ -26,20 +26,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   // Redirect to login if not authenticated
-  if (!user) {
+  if (!user || !profile) {
     return <Navigate to="/auth" replace />;
-  }
-
-  // If user is authenticated but profile is not loaded yet, show loading
-  if (!profile) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading your profile...</p>
-        </div>
-      </div>
-    );
   }
 
   // Check role-based access if required

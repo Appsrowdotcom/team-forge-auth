@@ -68,15 +68,12 @@ export const AuthForm: React.FC = () => {
           description: error.message,
         });
       } else {
-        console.log('Sign in successful, auth state should change soon...');
         toast({
           title: "Welcome back!",
           description: "You have been signed in successfully.",
         });
-        // Note: Redirection will be handled by AuthPage component when auth state updates
       }
     } catch (error) {
-      console.error('Sign in error:', error);
       toast({
         variant: "destructive",
         title: "Error",
